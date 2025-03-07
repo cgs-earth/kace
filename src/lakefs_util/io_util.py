@@ -154,9 +154,9 @@ async def download_file(file_name, repo, branch, download_path,
 
     if download_path.endswith('.gz'):
         decompressed_path = download_path.rstrip('.gz')
-        with gzip.open(download_path, 'rb') as gz_file:
-            with open(decompressed_path, 'wb') as decompressed_file:
-                decompressed_file.write(gz_file.read())
+        with gzip.open(download_path, 'rb') as gz_file, open(decompressed_path, 'wb') as decompressed_file:
+            while chunk := gz_file.read(65_536):
+                decompressed_file.write(chunk)
         logger.info(f"Decompressed {file_name} to {decompressed_path}")
 
 
