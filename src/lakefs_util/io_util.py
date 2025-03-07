@@ -4,6 +4,7 @@ import aiohttp
 import lakefs_sdk.configuration
 import asyncio
 from config import config
+import gzip
 from log_util import LoggingUtil
 from lakefs_util.semver_util import get_latest_version, bump_version
 from lakefs.models import Commit
@@ -110,8 +111,14 @@ async def download_files(repo: str, branch: str, extensions: List = None):
             logger.info(f"Directory {base_dir} does not exist; creating it ")
             os.makedirs(base_dir)
         for file_name in all_files:
-            if file_name.split('.')[-1] in extensions:
+            suffixes = file_name.split('.')
+            if suffixes[-1] in extensions:
                 files_downloaded.append(file_name.lstrip('/'))
+                download_path = os.path.join(base_dir, file_name)
+                await download_file(file_name, repo, branch, download_path, session)
+                logger.info(f"Download {file_name} complete")
+            elif suffixes[-2] in extensions and suffixes[-1] == 'gz':
+                files_downloaded.append(file_name.lstrip('/').rstrip('gz'))
                 download_path = os.path.join(base_dir, file_name)
                 await download_file(file_name, repo, branch, download_path, session)
                 logger.info(f"Download {file_name} complete")
@@ -144,6 +151,13 @@ async def download_file(file_name, repo, branch, download_path,
                 stream.write(content)
             current_pos = to_bytes + 1
     logger.info(f"Download {file_name} complete")
+
+    if download_path.endswith('.gz'):
+        decompressed_path = download_path.rstrip('.gz')
+        with gzip.open(download_path, 'rb') as gz_file:
+            with open(decompressed_path, 'wb') as decompressed_file:
+                decompressed_file.write(gz_file.read())
+        logger.info(f"Decompressed {file_name} to {decompressed_path}")
 
 
 async def download_hdt_files(repo: str, branch: str, kg_name: str, hdt_path: str='hdt') -> None:
